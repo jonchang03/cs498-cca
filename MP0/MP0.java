@@ -39,23 +39,6 @@ public class MP0 {
         return ret;
     }
 
-
-    // https://stackoverflow.com/questions/3074154/sorting-a-hashmap-based-on-value-then-key
-    public class ValueThenKeyComparator<K extends Comparable<? super K>,
-                                    V extends Comparable<? super V>>
-    implements Comparator<Map.Entry<K, V>> {
-
-    public int compare(Map.Entry<K, V> a, Map.Entry<K, V> b) {
-        int cmp1 = a.getValue().compareTo(b.getValue());
-        if (cmp1 != 0) {
-            return cmp1;
-        } else {
-            return a.getKey().compareTo(b.getKey());
-        }
-    }
-
-}
-
     public String[] process() throws Exception{
     	String[] topItems = new String[20];
         Integer[] indices = getIndexes(); // rename from indexes
@@ -93,13 +76,6 @@ public class MP0 {
             inputSentences.add(words);
         }
         sc.close();
-        // for (ArrayList<String> sentences : inputSentences) {
-        //     for (String word : sentences) {
-        //         System.out.println(word);
-        //     }
-        // }
-        // int max = Collections.max(Arrays.asList(indices)); 
-        // System.out.println(max);
 
         /**
          * 4. Keep track of word frequencies. To make the application more interesting, 
