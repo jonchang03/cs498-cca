@@ -39,6 +39,23 @@ public class MP0 {
         return ret;
     }
 
+
+    // https://stackoverflow.com/questions/3074154/sorting-a-hashmap-based-on-value-then-key
+    public class ValueThenKeyComparator<K extends Comparable<? super K>,
+                                    V extends Comparable<? super V>>
+    implements Comparator<Map.Entry<K, V>> {
+
+    public int compare(Map.Entry<K, V> a, Map.Entry<K, V> b) {
+        int cmp1 = a.getValue().compareTo(b.getValue());
+        if (cmp1 != 0) {
+            return cmp1;
+        } else {
+            return a.getKey().compareTo(b.getKey());
+        }
+    }
+
+}
+
     public String[] process() throws Exception{
     	String[] topItems = new String[20];
         Integer[] indices = getIndexes(); // rename from indexes
@@ -53,7 +70,7 @@ public class MP0 {
             sentence = sc.nextLine();
             /**
              * 1. Divide each sentence into a list of words using delimiters provided 
-             * in the “delimiters” variable.
+             * in the "delimiters" variable.
              */
             ArrayList<String> words = new ArrayList<String>();
             StringTokenizer st = new StringTokenizer(sentence, delimiters);
@@ -66,7 +83,7 @@ public class MP0 {
                 token = st.nextToken().toLowerCase().trim();
 
                 /**
-                 * 3. Ignore all common words provided in the “stopWordsArray” variable.
+                 * 3. Ignore all common words provided in the "stopWordsArray" variable.
                  */
                 if(!Arrays.stream(stopWordsArray).anyMatch(token::equals)) {
                     words.add(token);
@@ -76,7 +93,6 @@ public class MP0 {
             inputSentences.add(words);
         }
         sc.close();
-        // System.out.println(inputSentences.size());
         // for (ArrayList<String> sentences : inputSentences) {
         //     for (String word : sentences) {
         //         System.out.println(word);
@@ -88,7 +104,7 @@ public class MP0 {
         /**
          * 4. Keep track of word frequencies. To make the application more interesting, 
          * you have to process only the titles with certain indexes. These indexes are 
-         * accessible using the “getIndexes” method, which returns an Integer Array with
+         * accessible using the "getIndexes" method, which returns an Integer Array with
          * 0-based indexes to the input file. It is possible to have an index appear
          * several times. In this case, just process the index multiple times.
          */
@@ -98,6 +114,7 @@ public class MP0 {
         // loop through the indices
         for (int i : indices) {
             ArrayList<String> words = inputSentences.get(i);
+            // System.out.println(words);
             for (String w : words) {
                 Integer n = frequencyCounter.get(w);
                 n = (n == null) ? 1 : ++n;
@@ -109,13 +126,12 @@ public class MP0 {
          * 5. Sort the words by frequency in a descending order. If two words have the 
          * same number count, use the lexigraphy.
          */
-        // https://www.javacodegeeks.com/2017/09/java-8-sorting-hashmap-values-ascending-descending-order.html
-        Map<String, Integer> sortedMap = frequencyCounter
-            .entrySet()
-            .stream()
-            .sorted(Collections.reverseOrder(Entry.comparingByValue()))
+        // https://stackoverflow.com/questions/44739814/how-to-iterate-through-map-by-values-and-if-the-values-are-same-sort-them-by-key/44740231
+        Map<String, Integer> sortedMap = frequencyCounter.entrySet().stream()
+            .sorted(Map.Entry.<String, Integer>comparingByValue().reversed()
+                    .thenComparing(Map.Entry.comparingByKey()))
             .collect(Collectors.toMap(Entry::getKey, Entry::getValue,
-                           (o1, o2) -> o1, LinkedHashMap::new));
+                    (e1, e2) -> e1, LinkedHashMap::new));
         
         /**
          * 6. Print out the top 20 items from the sorted list as a String Array.
