@@ -48,6 +48,16 @@ public class OrphanPages extends Configured implements Tool {
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             //TODO
+            String line = value.toString();
+            StringTokenizer tokenizer = new StringTokenizer(line, " :");
+            IntWritable page = new IntWritable(Integer.parseInt(tokenizer.nextToken().trim()));
+            context.write(page, new IntWritable(0));
+
+			while (tokenizer.hasMoreTokens()) {
+                String nextToken = tokenizer.nextToken().trim();
+                IntWritable linkedPage = new IntWritable(Integer.parseInt(nextToken));
+                context.write(linkedPage, new IntWritable(1));
+			}
         }
     }
 
@@ -55,6 +65,14 @@ public class OrphanPages extends Configured implements Tool {
         @Override
         public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
             //TODO
+            int sum = 0;
+			for (IntWritable val : values) {
+				sum += val.get();
+            }
+            if (sum == 0) {
+                context.write(key, NullWritable.get());
+            }
+
         }
     }
 }
