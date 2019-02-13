@@ -140,16 +140,6 @@ public class PopularityLeague extends Configured implements Tool {
             Configuration conf = context.getConfiguration();
             String leaguePath = conf.get("league");
             this.leagueList = Arrays.asList(readHDFSFile(leaguePath, conf).split("\n"));
-            // Path leaguePath = new Path(conf.get("league"));
-            // FileSystem fs = FileSystem.get(conf);
-            // BufferedReader reader = new BufferedReader(
-            //   new InputStreamReader(fs.open(leaguePath))
-            // );
-            // String line = reader.readLine();
-            // while (line != null) {
-            //   leagueList.add(Integer.parseInt(line.trim()));
-            //   line = reader.readLine();
-            // }
         }
        
        @Override
@@ -190,12 +180,14 @@ public class PopularityLeague extends Configured implements Tool {
 				IntWritable[] pair = (IntWritable[]) val.toArray();
 				Integer link = pair[0].get();
 				Integer count = pair[1].get();
-				countTopLeagueMap.add(new Pair<Integer, Integer>(link, count)); // swap order
+				countTopLeagueMap.add(new Pair<Integer, Integer>(link, count)); // want to order by link first
 			}
             /**
              * The rank of the page is the number of pages in the league with strictly less (not equal) 
              * popularity than the original page.
              */
+            
+             // need to reverse TreeSet for descending order
             NavigableSet<Pair<Integer, Integer>> countTopLeagueMapReversed = new TreeSet<Pair<Integer, Integer>>();
             countTopLeagueMapReversed = countTopLeagueMap.descendingSet();
 			for (Pair<Integer, Integer> item1 : countTopLeagueMapReversed) {
