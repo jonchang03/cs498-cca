@@ -34,6 +34,43 @@ public class PopularityLeague extends Configured implements Tool {
     @Override
     public int run(String[] args) throws Exception {
         //TODO
+        Configuration conf = this.getConf();
+        FileSystem fs = FileSystem.get(conf);
+        Path tmpPath = new Path("./tmp");
+        fs.delete(tmpPath, true);
+
+        Job jobA = Job.getInstance(conf, "Link Count");
+        jobA.setOutputKeyClass(IntWritable.class);
+        jobA.setOutputValueClass(IntWritable.class);
+
+        jobA.setMapperClass(LinkCountMap.class);
+        jobA.setReducerClass(LinkCountReduce.class);
+
+        FileInputFormat.setInputPaths(jobA, new Path(args[0]));
+        FileOutputFormat.setOutputPath(jobA, tmpPath);
+
+        jobA.setJarByClass(PopularityLeague.class);
+        jobA.waitForCompletion(true);
+
+        Job jobB = Job.getInstance(conf, "Popularity League");
+        jobB.setOutputKeyClass(IntWritable.class);
+        jobB.setOutputValueClass(IntWritable.class);
+
+        jobB.setMapOutputKeyClass(NullWritable.class);
+        jobB.setMapOutputValueClass(IntArrayWritable.class);
+
+        jobB.setMapperClass(PopLeagueMap.class);
+        jobB.setReducerClass(PopLeagueReduce.class);
+        jobB.setNumReduceTasks(1);
+
+        FileInputFormat.setInputPaths(jobB, tmpPath);
+        FileOutputFormat.setOutputPath(jobB, new Path(args[1]));
+
+        jobB.setInputFormatClass(KeyValueTextInputFormat.class);
+        jobB.setOutputFormatClass(TextOutputFormat.class);
+
+        jobB.setJarByClass(PopularityLeague.class);
+        return jobB.waitForCompletion(true) ? 0 : 1;
     }
 
     public static class IntArrayWritable extends ArrayWritable {
@@ -67,4 +104,167 @@ public class PopularityLeague extends Configured implements Tool {
     }
 
     //TODO
+    public static class LinkCountMap extends Mapper<Object, Text, IntWritable, IntWritable> {
+        @Override
+        public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+            String line = value.toString();
+            StringTokenizer tokenizer = new StringTokenizer(line, " :");
+            IntWritable page = new IntWritable(Integer.parseInt(tokenizer.nextToken().trim()));
+            context.write(page, new IntWritable(0));
+
+			while (tokenizer.hasMoreTokens()) {
+                String nextToken = tokenizer.nextToken().trim();
+                IntWritable linkedPage = new IntWritable(Integer.parseInt(nextToken));
+                context.write(linkedPage, new IntWritable(1));
+			}
+        }
+    }
+
+    public static class LinkCountReduce extends Reducer<IntWritable, IntWritable, IntWritable, IntWritable> {
+        @Override
+        public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+            int sum = 0;
+			for (IntWritable val : values) {
+				sum += val.get();
+			}
+			context.write(key, new IntWritable(sum));
+        }
+    }
+
+    public static class PopLeagueMap extends Mapper<Text, Text, NullWritable, IntArrayWritable> {
+        private TreeSet<Pair<Integer, Integer>> countTopLeagueMap = new TreeSet<Pair<Integer, Integer>>();
+        List<String> leagueList;
+
+        @Override
+        protected void setup(Context context) throws IOException,InterruptedException {
+            Configuration conf = context.getConfiguration();
+            String leaguePath = conf.get("league");
+            this.leagueList = Arrays.asList(readHDFSFile(leaguePath, conf).split("\n"));
+            // Path leaguePath = new Path(conf.get("league"));
+            // FileSystem fs = FileSystem.get(conf);
+            // BufferedReader reader = new BufferedReader(
+            //   new InputStreamReader(fs.open(leaguePath))
+            // );
+            // String line = reader.readLine();
+            // while (line != null) {
+            //   leagueList.add(Integer.parseInt(line.trim()));
+            //   line = reader.readLine();
+            // }
+        }
+       
+       @Override
+       public void map(Text key, Text value, Context context) throws IOException, InterruptedException {
+            Integer count = Integer.parseInt(value.toString());
+            Integer link = Integer.parseInt(key.toString());
+
+            List<Integer> intLeagueList = new ArrayList<Integer>();
+            for(String s : leagueList) intLeagueList.add(Integer.valueOf(s));
+
+            if (intLeagueList.contains(link)) {
+                countTopLeagueMap.add(new Pair<Integer, Integer>(count, link));
+            }
+       }
+
+       @Override
+       protected void cleanup(Context context) throws IOException, InterruptedException {
+           for (Pair<Integer, Integer> item : countTopLeagueMap) {
+               Integer[] link = {item.second, item.first};
+               IntArrayWritable val = new IntArrayWritable(link);
+               context.write(NullWritable.get(), val);
+           }
+       }
+
+    }
+
+    public static class PopLeagueReduce extends Reducer<NullWritable, IntArrayWritable, IntWritable, IntWritable> {
+        private TreeSet<Pair<Integer, Integer>> countTopLeagueMap = new TreeSet<Pair<Integer, Integer>>();
+
+        @Override
+        protected void setup(Context context) throws IOException,InterruptedException {
+            Configuration conf = context.getConfiguration();
+        }
+        
+        @Override
+        public void reduce(NullWritable key, Iterable<IntArrayWritable> values, Context context) throws IOException, InterruptedException {
+            for (IntArrayWritable val : values) {
+				IntWritable[] pair = (IntWritable[]) val.toArray();
+				Integer link = pair[0].get();
+				Integer count = pair[1].get();
+				countTopLeagueMap.add(new Pair<Integer, Integer>(link, count)); // swap order
+			}
+            /**
+             * The rank of the page is the number of pages in the league with strictly less (not equal) 
+             * popularity than the original page.
+             */
+            NavigableSet<Pair<Integer, Integer>> countTopLeagueMapReversed = new TreeSet<Pair<Integer, Integer>>();
+            countTopLeagueMapReversed = countTopLeagueMap.descendingSet();
+			for (Pair<Integer, Integer> item1 : countTopLeagueMapReversed) {
+                int r = 0;
+                for ( Pair<Integer, Integer> item2 : countTopLeagueMapReversed) {
+                    if (item1.second.compareTo(item2.second) > 0) {
+                        r++;
+                    }
+                }
+                IntWritable link = new IntWritable(item1.first);
+                IntWritable rank = new IntWritable(r);
+                context.write(link, rank);
+            }
+        }
+    } 
+}
+
+
+
+
+class Pair<A extends Comparable<? super A>,
+        B extends Comparable<? super B>>
+        implements Comparable<Pair<A, B>> {
+
+    public final A first;
+    public final B second;
+
+    public Pair(A first, B second) {
+        this.first = first;
+        this.second = second;
+    }
+
+    public static <A extends Comparable<? super A>,
+            B extends Comparable<? super B>>
+    Pair<A, B> of(A first, B second) {
+        return new Pair<A, B>(first, second);
+    }
+
+    @Override
+    public int compareTo(Pair<A, B> o) {
+        int cmp = o == null ? 1 : (this.first).compareTo(o.first);
+        return cmp == 0 ? (this.second).compareTo(o.second) : cmp;
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * hashcode(first) + hashcode(second);
+    }
+
+    private static int hashcode(Object o) {
+        return o == null ? 0 : o.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof Pair))
+            return false;
+        if (this == obj)
+            return true;
+        return equal(first, ((Pair<?, ?>) obj).first)
+                && equal(second, ((Pair<?, ?>) obj).second);
+    }
+
+    private boolean equal(Object o1, Object o2) {
+        return o1 == o2 || (o1 != null && o1.equals(o2));
+    }
+
+    @Override
+    public String toString() {
+        return "(" + first + ", " + second + ')';
+    }
 }

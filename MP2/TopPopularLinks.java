@@ -135,7 +135,7 @@ public class TopPopularLinks extends Configured implements Tool {
        public void map(Text key, Text value, Context context) throws IOException, InterruptedException {
            //TODO
            Integer count = Integer.parseInt(value.toString());
-           Integer link = Integer.parseInt(value.toString());
+           Integer link = Integer.parseInt(key.toString());
 
            countToLinkMap.add(new Pair<Integer, Integer>(count, link));
            if (countToLinkMap.size() > N) {
