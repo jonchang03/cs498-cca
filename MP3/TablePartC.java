@@ -65,7 +65,7 @@ public class TablePartC{
          hTable.put(p);
       }
       // Saving the put Instance to the HTable.
-      System.out.println("data inserted");
+      // System.out.println("data inserted");
       // closing HTable
       hTable.close();
 
