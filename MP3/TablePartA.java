@@ -21,7 +21,7 @@ public class TablePartA{
 
    public static void main(String[] args) throws IOException {
 
-	//TODO
+   //TODO
    // Instantiating configuration class
    Configuration con = HBaseConfiguration.create();
 
