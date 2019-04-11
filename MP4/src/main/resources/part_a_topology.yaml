@@ -93,8 +93,7 @@ streams:
     from: "spout-1"
     to: "bolt-1"
     grouping:
-      type: FIELDS
-      args: ["word"]
+      type: SHUFFLE
 
   # TODO
   # Task: pipe output of split bolt to word count bolt
@@ -103,7 +102,9 @@ streams:
     from: "bolt-1"
     to: "bolt-2"
     grouping:
-      type: SHUFFLE
+      type: FIELDS
+      args: ["word"]
+
       
   # TODO
   # Task: pipe output of word count bolt to redis store bolt
@@ -111,5 +112,4 @@ streams:
     from: "bolt-2"
     to: "bolt-3"
     grouping:
-      type: FIELDS
-      args: ["word"]
+      type: SHUFFLE

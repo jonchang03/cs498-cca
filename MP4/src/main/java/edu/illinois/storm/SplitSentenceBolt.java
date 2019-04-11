@@ -17,7 +17,7 @@ public class SplitSentenceBolt extends BaseBasicBolt {
 		Hint: split on "[^a-zA-Z0-9]"
     ------------------------------------------------- */
     String sentence = tuple.getString(0);
-    String[] words = sentence.split("[^a-zA-Z0-9]");
+    String[] words = sentence.split("[^a-zA-Z0-9-]");
 
     for(String word : words){
       collector.emit(new Values(word));

@@ -45,15 +45,57 @@ components:
       - 0
 
   # Hint: redis hash key for part b is "partBWordCount"
+  - id: "storeMapper"
+    className: "edu.illinois.storm.WordCountStoreMapper"
+    constructorArgs:
+      - "partBWordCount"
 
 # spout definitions
 spouts:
   # Hint: the new file reading spout you need implement in this part is
   # src/main/java/edu/illinois/storm/FileReaderSpout.java
+  - id: "spout-1"
+    className: "edu.illinois.storm.FileReaderSpout"
+    properties:
+      - name: "inputFile"
+        value: "/tmp/data.txt"
+    parallelism: 1
 
 # bolt definitions
 bolts:
+  - id: "bolt-1"
+    className: "edu.illinois.storm.SplitSentenceBolt"
+    parallelism: 1
+
+  - id: "bolt-2"
+    className: "edu.illinois.storm.WordCountBolt"
+    parallelism: 1
+  
+  - id: "bolt-3"
+    className: "org.apache.storm.redis.bolt.RedisStoreBolt"
+    constructorArgs:
+      - ref: "poolConfig"
+      - ref: "storeMapper"
+    parallelism: 1
 
 # stream definitions
 # stream definitions define connections between spouts and bolts.
 streams:
+  - name: "spout-1 --> bolt-1"
+    from: "spout-1"
+    to: "bolt-1"
+    grouping:
+      type: SHUFFLE
+
+  - name: "bolt-1 --> bolt-2"
+    from: "bolt-1"
+    to: "bolt-2"
+    grouping:
+      type: FIELDS
+      args: ["word"]
+
+  - name: "bolt-2 --> bolt-3"
+    from: "bolt-2"
+    to: "bolt-3"
+    grouping:
+      type: SHUFFLE

@@ -11,6 +11,7 @@ import org.apache.storm.topology.IRichSpout;
 import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Values;
+import org.apache.storm.utils.Utils;
 
 /** a spout that generate sentences from a file */
 public class FileReaderSpout implements IRichSpout {
@@ -19,6 +20,7 @@ public class FileReaderSpout implements IRichSpout {
   private String inputFile;
 
   // Hint: Add necessary instance variables if needed
+  private BufferedReader reader;
 
   @Override
   public void open(Map conf, TopologyContext context, SpoutOutputCollector collector) {
@@ -28,15 +30,22 @@ public class FileReaderSpout implements IRichSpout {
     /* ----------------------TODO-----------------------
     Task: initialize the file reader
     ------------------------------------------------- */
-
+    try {
+      reader = new BufferedReader(new FileReader(inputFile));
+    } catch (FileNotFoundException e) {
+        e.printStackTrace();
+    }
     // END
 
   }
 
   // Set input file path
-  public FileReaderSpout withInputFileProperties(String inputFile) {
+  // public FileReaderSpout withInputFileProperties(String inputFile) {
+  //   this.inputFile = inputFile;
+  //   return this;
+  // }
+  public void setInputFile(String inputFile) {
     this.inputFile = inputFile;
-    return this;
   }
 
   @Override
@@ -47,6 +56,15 @@ public class FileReaderSpout implements IRichSpout {
     1. read the next line and emit a tuple for it
     2. don't forget to add a small sleep when the file is entirely read to prevent a busy-loop
     ------------------------------------------------- */
+    try{
+      while(reader.ready()) {
+          String line = reader.readLine();
+          _collector.emit(new Values(line));
+      }
+    } catch(IOException e){
+        e.printStackTrace();
+    }
+    Utils.sleep(1000);
     // END
   }
 
@@ -55,7 +73,7 @@ public class FileReaderSpout implements IRichSpout {
     /* ----------------------TODO-----------------------
     Task: define the declarer
     ------------------------------------------------- */
-
+    declarer.declare(new Fields("word"));
     // END
   }
 
@@ -64,7 +82,11 @@ public class FileReaderSpout implements IRichSpout {
     /* ----------------------TODO-----------------------
     Task: close the file
     ------------------------------------------------- */
-
+    try {
+      reader.close();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
     // END
 
   }
