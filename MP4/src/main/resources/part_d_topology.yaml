@@ -48,9 +48,19 @@ components:
   # Task: implement the redis store mapper
   # src/main/java/edu/illinois/storm/TopNStoreMapper.java
   # redis hash key for part d is "partDTopN"
+  - id: "storeMapper"
+    className: "edu.illinois.storm.TopNStoreMapper"
+    constructorArgs:
+      - "partDTopN"
 
 # spout definitions
 spouts:
+  - id: "spout-1"
+    className: "edu.illinois.storm.FileReaderSpout"
+    properties:
+      - name: "inputFile"
+        value: "/tmp/data.txt"
+    parallelism: 1
 
 # bolt definitions
 bolts:
@@ -58,8 +68,62 @@ bolts:
   # src/main/java/edu/illinois/storm/TopNFinderBolt.java
   # You need to pass N to the bolt here
   # make sure it's 10 in your final submission
+  - id: "bolt-1"
+    className: "edu.illinois.storm.SplitSentenceBolt"
+    parallelism: 1
+
+  - id: "bolt-2"
+    className: "edu.illinois.storm.NormalizerBolt"
+    parallelism: 1
+
+  - id: "bolt-3"
+    className: "edu.illinois.storm.WordCountBolt"
+    parallelism: 1
+    
+  - id: "bolt-4"
+    className: "edu.illinois.storm.TopNFinderBolt"
+    constructorArgs:
+      - 10
+    parallelism: 1
+  
+  - id: "bolt-5"
+    className: "org.apache.storm.redis.bolt.RedisStoreBolt"
+    constructorArgs:
+      - ref: "poolConfig"
+      - ref: "storeMapper"
+    parallelism: 1
 
 
 # stream definitions
 # stream definitions define connections between spouts and bolts.
 streams:
+  - name: "spout-1 --> bolt-1"
+    from: "spout-1"
+    to: "bolt-1"
+    grouping:
+      type: SHUFFLE
+  
+  - name: "bolt-1 --> bolt-2"
+    from: "bolt-1"
+    to: "bolt-2"
+    grouping:
+      type: SHUFFLE
+
+  - name: "bolt-2 --> bolt-3"
+    from: "bolt-2"
+    to: "bolt-3"
+    grouping:
+      type: FIELDS
+      args: ["word"]
+      
+  - name: "bolt-3 --> bolt-4"
+    from: "bolt-3"
+    to: "bolt-4"
+    grouping:
+      type: SHUFFLE
+      
+  - name: "bolt-4 --> bolt-5"
+    from: "bolt-4"
+    to: "bolt-5"
+    grouping:
+      type: SHUFFLE
