@@ -64,7 +64,7 @@ public class FileReaderSpout implements IRichSpout {
     } catch(IOException e){
         e.printStackTrace();
     }
-    Utils.sleep(1000);
+    Utils.sleep(500);
     // END
   }
 

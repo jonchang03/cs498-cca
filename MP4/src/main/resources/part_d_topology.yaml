@@ -120,7 +120,7 @@ streams:
     from: "bolt-3"
     to: "bolt-4"
     grouping:
-      type: SHUFFLE
+      type: GLOBAL
       
   - name: "bolt-4 --> bolt-5"
     from: "bolt-4"

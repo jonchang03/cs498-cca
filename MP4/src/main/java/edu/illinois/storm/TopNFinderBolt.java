@@ -12,6 +12,9 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 /** a bolt that finds the top n words. */
 public class TopNFinderBolt extends BaseRichBolt {
@@ -19,8 +22,11 @@ public class TopNFinderBolt extends BaseRichBolt {
 
   // Hint: Add necessary instance variables and inner classes if needed
   private int N;
-  private HashMap<String, Integer> currentTopWords = new HashMap<String, Integer>();
+  private long intervalToReport = 20;
+  private long lastReportTime = System.currentTimeMillis();
 
+  private ConcurrentMap<String, Integer> map =  new ConcurrentHashMap<String, Integer>();
+  
   @Override
   public void prepare(Map conf, TopologyContext context, OutputCollector collector) {
     this.collector = collector;
@@ -48,30 +54,66 @@ public class TopNFinderBolt extends BaseRichBolt {
     ------------------------------------------------- */
     String word = tuple.getString(0);
     Integer count = Integer.parseInt(tuple.getString(1));
-    currentTopWords.put(word, count);
-    if (currentTopWords.size() > N){
-        Collection<Integer> values = currentTopWords.values();
-        values.remove(Collections.min(values));
+
+    Integer val = map.get(word);
+    if(val == null){
+        map.put(word, count); 
     }
-  
-    collector.emit(new Values("top-N", printMap()));
+    else{
+        map.put(word, val + count);
+    }
+    
+    //reports the top N words periodically
+    if (System.currentTimeMillis() - lastReportTime >= intervalToReport) {
+      collector.emit(new Values("top-N", printMap()));
+      lastReportTime = System.currentTimeMillis();
+    }
+    // collector.emit(new Values("top-N", printMap()));
 
 		// End
   }
-
   public String printMap() {
-    StringBuilder stringBuilder = new StringBuilder();
+    StringBuffer sb = new StringBuffer();
+
+    // Vector<Entry<String, Integer>> vec = new Vector<Entry<String, Integer>>(map.entrySet());
+    // Collections.sort(vec, new Comparator<Entry<String, Integer>>(){
+    //     public int compare(Entry<String, Integer> o1, Entry<String, Integer> o2){
+    //       // Compare value by frequency 
+    //       int freqCompare = o1.getValue().compareTo(o2.getValue());
     
-    // stringBuilder.append("top-words = [ ");
-    for (String word : currentTopWords.keySet()) {
-      // stringBuilder.append("(" + word + " , " + currentTopWords.get(word) + ") , ");
-      stringBuilder.append(word + ", ");
+    //       // Compare value if frequency is equal 
+    //       int valueCompare = o1.getKey().compareTo(o2.getKey()); 
+    
+    //       // If frequency is equal, then just compare by value, otherwise - 
+    //       // compare by the frequency. 
+    //       if (freqCompare == 0) 
+    //           return valueCompare; 
+    //       else
+    //           return freqCompare; 
+    //     }
+    // });
+    // int left = Math.max(vec.size() - N, 0);
+    // for(int i = left ; i < vec.size(); i++){
+    //     sb.append(vec.get(i).getKey() + ", ");
+    // }
+    Map<String, Integer> sortedMap = map.entrySet().stream()
+      .sorted(Map.Entry.<String, Integer>comparingByValue().reversed()
+              .thenComparing(Map.Entry.<String, Integer>comparingByKey().reversed()))
+      .collect(Collectors.toMap(Entry::getKey, Entry::getValue,
+              (e1, e2) -> e1, LinkedHashMap::new));
+
+    Set<String> keys = sortedMap.keySet();
+    String[] keysArray = keys.toArray(new String[keys.size()]);
+    for(int i=0; i<keysArray.length && i<N; i++) {
+        sb.append(keysArray[i] + ", ");
     }
-    int lastCommaIndex = stringBuilder.lastIndexOf(",");
-    stringBuilder.deleteCharAt(lastCommaIndex + 1);
-    stringBuilder.deleteCharAt(lastCommaIndex);
-    // stringBuilder.append("]");
-    return stringBuilder.toString();
+
+
+
+    int lastCommaIndex = sb.lastIndexOf(",");
+    sb.deleteCharAt(lastCommaIndex + 1);
+    sb.deleteCharAt(lastCommaIndex);
+    return sb.toString();
   }
 
   @Override
