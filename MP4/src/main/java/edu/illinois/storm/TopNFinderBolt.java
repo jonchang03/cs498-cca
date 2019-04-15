@@ -15,31 +15,27 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
+import edu.illinois.storm.Pair;
 
 /** a bolt that finds the top n words. */
 public class TopNFinderBolt extends BaseRichBolt {
   private OutputCollector collector;
 
   // Hint: Add necessary instance variables and inner classes if needed
-  private int N;
-  private long intervalToReport = 20;
+  private int N = 10;
+  private long intervalToReport = 20; 
   private long lastReportTime = System.currentTimeMillis();
 
-  private ConcurrentMap<String, Integer> map =  new ConcurrentHashMap<String, Integer>();
-  
+  private HashMap<String, Integer> currentTopWords = new HashMap<String, Integer>();
+  // private HashMap<String, Integer> map = new HashMap<String, Integer>();
+
+  private PriorityQueue<Pair> queue = new PriorityQueue<Pair>();
+
+
   @Override
   public void prepare(Map conf, TopologyContext context, OutputCollector collector) {
     this.collector = collector;
   }
-
-  // public TopNFinderBolt withNProperties(int N) {
-  //   /* ----------------------TODO-----------------------
-  //   Task: set N
-  //   ------------------------------------------------- */
-
-	// 	// End
-	// 	return this;
-  // }
 
   public TopNFinderBolt(int N) {
     this.N = N;
@@ -54,17 +50,62 @@ public class TopNFinderBolt extends BaseRichBolt {
     ------------------------------------------------- */
     String word = tuple.getString(0);
     Integer count = Integer.parseInt(tuple.getString(1));
-
-    Integer val = map.get(word);
-    if(val == null){
-        map.put(word, count); 
-    }
-    else{
-      if(count > val)
-        map.put(word, count);
-    }
     
-    //reports the top N words periodically
+    // if(map.containsKey(word)){
+    //   if(count > map.get(word)) {
+    //     map.put(word, count);
+    //   }
+    // } else{
+    //   map.put(word, count);
+    // }
+    
+
+    //  maintain a heap of size N. 
+    Pair p = new Pair(word, count);
+  
+    // need to make sure key doesn't already exist
+    // maintain set of words
+
+    if (queue.size() <= N) {
+      // if word isn't in current top 10
+      if (!currentTopWords.containsKey(word)){
+        queue.add(p);
+        currentTopWords.put(word, count);
+      } 
+      // if word is in current top 10, and higher count is received
+      else if (count > currentTopWords.get(word)) {
+        currentTopWords.put(word, count);
+      } else { // otherwise we'll keep the original count
+        count = currentTopWords.get(word);
+      }
+    }
+
+    // remove minimum to make way for new entry
+    else if (queue.peek().getValue() < count) {
+      // remove entry from hash map by value
+      currentTopWords.remove(queue.peek().getKey());
+      if (!currentTopWords.containsKey(word)){
+        queue.poll();
+        queue.add(p);
+      }
+      currentTopWords.put(word, count);
+    } 
+
+ 
+    //get all elements from the heap
+    //  List<Integer> result = new ArrayList<>();
+    // currentTopWords.clear();
+
+    // PriorityQueue<Pair> queue_copy = new PriorityQueue<Pair>(queue);
+    // while(queue_copy.size() > 0){
+    //     currentTopWords.put(queue_copy.peek().getKey(), queue_copy.peek().getValue()); // can't poll both
+    //     queue_copy.poll();
+    // }
+
+
+  
+
+    // reports the top N words periodically
     if (System.currentTimeMillis() - lastReportTime >= intervalToReport) {
       collector.emit(new Values("top-N", printMap()));
       lastReportTime = System.currentTimeMillis();
@@ -73,52 +114,19 @@ public class TopNFinderBolt extends BaseRichBolt {
 
 		// End
   }
+
   public String printMap() {
-    StringBuffer sb = new StringBuffer();
-
-    // Vector<Entry<String, Integer>> vec = new Vector<Entry<String, Integer>>(map.entrySet());
-    // Collections.sort(vec, new Comparator<Entry<String, Integer>>(){
-    //     public int compare(Entry<String, Integer> o1, Entry<String, Integer> o2){
-    //       // Compare value by frequency 
-    //       int freqCompare = o1.getValue().compareTo(o2.getValue());
-    
-    //       // Compare value if frequency is equal 
-    //       int valueCompare = o1.getKey().compareTo(o2.getKey()); 
-    
-    //       // If frequency is equal, then just compare by value, otherwise - 
-    //       // compare by the frequency. 
-    //       if (freqCompare == 0) 
-    //           return valueCompare; 
-    //       else
-    //           return freqCompare; 
-    //     }
-    // });
-    // int left = Math.max(vec.size() - N, 0);
-    // for(int i = left ; i < vec.size(); i++){
-    //     sb.append(vec.get(i).getKey() + ", ");
-    // }
-    Map<String, Integer> sortedMap = map.entrySet().stream()
-              .sorted(Map.Entry.<String, Integer>comparingByValue().reversed()
-              .thenComparing(Map.Entry.<String, Integer>comparingByKey().reversed()))
-              .limit(N)
-              .collect(Collectors.toMap(Entry::getKey, Entry::getValue,
-                  (e1, e2) -> e1, LinkedHashMap::new));
-
-    // Set<String> keys = sortedMap.keySet();
-    // String[] keysArray = keys.toArray(new String[keys.size()]);
-    // for(int i=0; i<keysArray.length && i<N; i++) {
-    //     sb.append(keysArray[i] + ", ");
-    // }
-    for (Map.Entry<String, Integer> entry : sortedMap.entrySet()) {
-      sb.append(entry.getKey() + ", ");
+    StringBuilder stringBuilder = new StringBuilder();
+    stringBuilder.append("top-words = [ ");
+    for (String word : currentTopWords.keySet()) {
+        stringBuilder.append("(" + word + " , " + currentTopWords.get(word) + ") , ");
     }
+    int lastCommaIndex = stringBuilder.lastIndexOf(",");
+    stringBuilder.deleteCharAt(lastCommaIndex + 1);
+    stringBuilder.deleteCharAt(lastCommaIndex);
+    stringBuilder.append("]");
+    return stringBuilder.toString();
 
-
-
-    int lastCommaIndex = sb.lastIndexOf(",");
-    sb.deleteCharAt(lastCommaIndex + 1);
-    sb.deleteCharAt(lastCommaIndex);
-    return sb.toString();
   }
 
   @Override
@@ -132,5 +140,37 @@ public class TopNFinderBolt extends BaseRichBolt {
     declarer.declare(new Fields("top-N", "top-N-words"));
     // END
   }
-
 }
+
+// class Pair
+// {
+//   String word;
+//   int count;
+//   // Constructor
+//   public Pair(String word, int count){
+//       this.word=word;
+//       this.count=count;
+//   }
+// }
+
+
+// // Comparator to compare Strings 
+// // https://www.geeksforgeeks.org/priorityblockingqueue-comparator-method-in-java/
+// class COMPARING implements Comparator<Pair> { 
+//   @Override
+//   public int compare(Pair p1, Pair p2) 
+//   { 
+//       // Compare value by frequency 
+//       int freqCompare = Integer.compare(p2.count, p1.count); 
+
+//       // Compare value if frequency is equal 
+//       int valueCompare = p1.word.compareTo(p2.word); 
+
+//       // If frequency is equal, then just compare by value, otherwise - 
+//       // compare by the frequency. 
+//       if (freqCompare == 0) 
+//           return valueCompare; 
+//       else
+//           return freqCompare; 
+//   } 
+// }
