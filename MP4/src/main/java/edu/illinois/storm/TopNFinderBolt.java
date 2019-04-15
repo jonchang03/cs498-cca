@@ -60,7 +60,8 @@ public class TopNFinderBolt extends BaseRichBolt {
         map.put(word, count); 
     }
     else{
-        map.put(word, val + count);
+      if(count > val)
+        map.put(word, count);
     }
     
     //reports the top N words periodically
@@ -97,15 +98,19 @@ public class TopNFinderBolt extends BaseRichBolt {
     //     sb.append(vec.get(i).getKey() + ", ");
     // }
     Map<String, Integer> sortedMap = map.entrySet().stream()
-      .sorted(Map.Entry.<String, Integer>comparingByValue().reversed()
+              .sorted(Map.Entry.<String, Integer>comparingByValue().reversed()
               .thenComparing(Map.Entry.<String, Integer>comparingByKey().reversed()))
-      .collect(Collectors.toMap(Entry::getKey, Entry::getValue,
-              (e1, e2) -> e1, LinkedHashMap::new));
+              .limit(N)
+              .collect(Collectors.toMap(Entry::getKey, Entry::getValue,
+                  (e1, e2) -> e1, LinkedHashMap::new));
 
-    Set<String> keys = sortedMap.keySet();
-    String[] keysArray = keys.toArray(new String[keys.size()]);
-    for(int i=0; i<keysArray.length && i<N; i++) {
-        sb.append(keysArray[i] + ", ");
+    // Set<String> keys = sortedMap.keySet();
+    // String[] keysArray = keys.toArray(new String[keys.size()]);
+    // for(int i=0; i<keysArray.length && i<N; i++) {
+    //     sb.append(keysArray[i] + ", ");
+    // }
+    for (Map.Entry<String, Integer> entry : sortedMap.entrySet()) {
+      sb.append(entry.getKey() + ", ");
     }
 
 
