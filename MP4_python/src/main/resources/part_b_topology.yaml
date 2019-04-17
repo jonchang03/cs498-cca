@@ -1,0 +1,133 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+
+# topology definition
+# name to be used when submitting
+name: "part-B"
+
+# TODO
+# Task: implement your topology for part b
+
+# topology configuration
+# this will be passed to the submitter as a map of config options
+config:
+    storm.local.hostname: "localhost"
+    topology.max.task.parallelism: 3
+    # set this to true if you want to see more debug log
+    # set it to false before submitting
+    topology.debug: true
+    # Hint: you can set input file path here
+    # make sure it's "/tmp/data.txt" in your final submission
+    mp4.datafile: "/tmp/data.txt"
+
+components:
+  - id: "poolConfig"
+    className: "org.apache.storm.redis.common.config.JedisPoolConfig"
+    constructorArgs:
+      - "localhost"
+      - 6379
+      - 2000
+      - "uiuc_cs498_mp4"
+      - 0
+
+  # Hint: redis hash key for part b is "partBWordCount"
+  - id: "storeMapper"
+    className: "edu.illinois.storm.WordCountStoreMapper"
+    constructorArgs:
+      - "partBWordCount"
+
+# spout definitions
+spouts:
+  # Hint: the new file reading spout you need implement in this part is
+  # multilang/resources/file_reader_spout.py
+  - id: "file-reader-spout"
+    className: "org.apache.storm.flux.wrappers.spouts.FluxShellSpout"
+    constructorArgs:
+      # Command line
+      - ["python", "file_reader_spout.py"]
+      # Output field(s)
+      - ["line"]
+    # parallelism hint
+    parallelism: 1
+
+# bolt definitions
+bolts:
+  - id: "split-sentences-bolt"
+    className: "org.apache.storm.flux.wrappers.bolts.FluxShellBolt"
+    constructorArgs:
+      # Command line
+      - ["python", "split_sentence_bolt.py"]
+      # Output field(s)
+      - ["word"]
+    parallelism: 1
+
+  # TODO
+  # Task: implement the word count bolt
+  # multilang/resources/word_count_bolt.py
+  - id: "word-count-bolt"
+    className: "org.apache.storm.flux.wrappers.bolts.FluxShellBolt"
+    constructorArgs:
+      # Command line
+      - ["python", "word_count_bolt.py"]
+      # Output field(s)
+      - ["word","count"]
+    parallelism: 1
+
+
+  # TODO
+  # Task: initialize RedisStoreBolt using poolConfig and storeMapper
+  # ClassName is "org.apache.storm.redis.bolt.RedisStoreBolt"
+  - id: "redis-store-bolt"
+    className: "org.apache.storm.redis.bolt.RedisStoreBolt"
+    constructorArgs:
+      - ref: "poolConfig"
+      - ref: "storeMapper"
+    parallelism: 1
+
+# stream definitions
+# stream definitions define connections between spouts and bolts.
+streams:
+  # TODO
+  # Task: pipe output of sentences generating spout to split bolt
+  - name: "Spout --> Splitter" # name isn't used (placeholder for logging, UI, etc.)
+    # The stream emitter
+    from: "file-reader-spout"
+    # The stream consumer
+    to: "split-sentences-bolt"
+    # Grouping type
+    grouping:
+      type: SHUFFLE
+
+  # TODO
+  # Task: pipe output of split bolt to word count bolt
+  # Hint: choose the right grouping type to make problem easier
+  - name: "Splitter --> Counter"
+    from: "split-sentences-bolt"
+    to: "word-count-bolt"
+    grouping:
+      type: FIELDS
+      # field(s) to group on
+      args: ["word"]
+
+  # TODO
+  # Task: pipe output of word count bolt to redis store bolt
+  - name: "Counter --> Redis"
+    from: "word-count-bolt"
+    to: "redis-store-bolt"
+    grouping:
+      type: SHUFFLE
