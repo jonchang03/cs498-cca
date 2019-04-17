@@ -18,7 +18,8 @@ class SplitBolt(storm.BasicBolt):
         words = re.split("[^a-zA-Z0-9-]", tup.values[0])
         for word in words:
             # storm.logInfo("Emitting %s" % word)
-            storm.emit([word])
+            if word: # check empty string
+                storm.emit([word])
         # pass
         # End
 

@@ -43,7 +43,11 @@ class TopNFinderBolt(storm.BasicBolt):
         # Emit the topN and count
         # field-value pairs ("top-N", {top N words string}) 
         top_n = "top-N"
-        top_n_words = str(top_n_values) # convert dict to string for now
+        # top_n_words = str(top_n_values) # convert dict to string for now
+        
+        # format for emit
+        top_n_list = [x[0] for x in top_n_values]
+        top_n_words = ", ".join(top_n_list)
         storm.emit([top_n, top_n_words]) 
 
         # End
