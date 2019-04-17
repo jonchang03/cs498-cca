@@ -36,6 +36,8 @@ config:
 
     # Hint: set N here
     # make sure it's 10 in your final submission
+    mp4.datafile: "/tmp/data.txt"
+    N: 10
 
 components:
   - id: "poolConfig"
@@ -51,17 +53,112 @@ components:
   # Task: implement the redis store mapper
   # src/main/java/edu/illinois/storm/TopNStoreMapper.java
   # redis hash key for part d is "partDTopN"
+  - id: "storeMapper"
+    className: "edu.illinois.storm.TopNStoreMapper"
+    constructorArgs:
+      - "partDTopN"
 
 # spout definitions
 spouts:
+  - id: "file-reader-spout"
+    className: "org.apache.storm.flux.wrappers.spouts.FluxShellSpout"
+    constructorArgs:
+      # Command line
+      - ["python", "file_reader_spout.py"]
+      # Output field(s)
+      - ["line"]
+    parallelism: 1
 
 # bolt definitions
 bolts:
+  - id: "split-sentences-bolt"
+    className: "org.apache.storm.flux.wrappers.bolts.FluxShellBolt"
+    constructorArgs:
+      # Command line
+      - ["python", "split_sentence_bolt.py"]
+      # Output field(s)
+      - ["word"]
+    parallelism: 1
+
+  # Hint: the new normalize bolt you need implement in this part is
+  # multilang/resources/normalizer_bolt.py
+  - id: "normalizer-bolt"
+    className: "org.apache.storm.flux.wrappers.bolts.FluxShellBolt"
+    constructorArgs:
+      # Command line
+      - ["python", "normalizer_bolt.py"]
+      # Output field(s)
+      - ["word"]
+    parallelism: 1
+
+  # TODO
+  # Task: implement the word count bolt
+  # multilang/resources/word_count_bolt.py
+  - id: "word-count-bolt"
+    className: "org.apache.storm.flux.wrappers.bolts.FluxShellBolt"
+    constructorArgs:
+      # Command line
+      - ["python", "word_count_bolt.py"]
+      # Output field(s)
+      - ["word","count"]
+    parallelism: 1
+  
   # Hint: the new top N tracking bolt you need implement in this part is
   # multilang/resources/top_n_finder_bolt.py
   # You need to load N from conf when initialize the bolt
+  - id: "top-N-bolt"
+    className: "org.apache.storm.flux.wrappers.bolts.FluxShellBolt"
+    constructorArgs:
+      # Command line
+      - ["python", "top_n_finder_bolt.py"]
+      # Output field(s)
+      - ["top-N","top_n_words"] ### need to change!!!
+    parallelism: 1
+  
+  # TODO
+  # Task: initialize RedisStoreBolt using poolConfig and storeMapper
+  # ClassName is "org.apache.storm.redis.bolt.RedisStoreBolt"
+  - id: "redis-store-bolt"
+    className: "org.apache.storm.redis.bolt.RedisStoreBolt"
+    constructorArgs:
+      - ref: "poolConfig"
+      - ref: "storeMapper"
+    parallelism: 1
 
 # stream definitions
 # stream definitions define connections between spouts and bolts.
 streams:
   # Hint: add new top N finder bolt into the topology
+  - name: "Spout --> Splitter" # name isn't used (placeholder for logging, UI, etc.)
+    from: "file-reader-spout"
+    to: "split-sentences-bolt"
+    grouping:
+      type: SHUFFLE
+
+  - name: "Splitter --> Normalizer"
+    from: "split-sentences-bolt"
+    to: "normalizer-bolt"
+    grouping:
+      type: SHUFFLE
+
+  - name: "Normalizer --> Counter"
+    from: "normalizer-bolt"
+    to: "word-count-bolt"
+    grouping:
+      type: FIELDS
+      # field(s) to group on
+      args: ["word"]
+      
+  - name: "Counter --> Top-N"
+    from: "word-count-bolt"
+    to: "top-N-bolt"
+    grouping:
+      type: GLOBAL
+
+  # TODO
+  # Task: pipe output of word count bolt to redis store bolt
+  - name: "Top-N --> Redis"
+    from: "top-N-bolt"
+    to: "redis-store-bolt"
+    grouping:
+      type: SHUFFLE

@@ -26,7 +26,7 @@ class CountBolt(storm.BasicBolt):
         # Increment the counter
         self._counter[word] +=1
         count = str(self._counter[word]) # cast to string for redis
-        storm.logInfo("Emitting %s:%s" % (word, count))
+        # storm.logInfo("Emitting %s:%s" % (word, count))
         # Emit the word and count
         storm.emit([word, count])
 

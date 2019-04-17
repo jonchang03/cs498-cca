@@ -5,7 +5,6 @@ from time import sleep
 # from streamparse import Spout
 import storm
 
-
 class FileReaderSpout(storm.Spout):
 
     def initialize(self, conf, context):
@@ -17,7 +16,8 @@ class FileReaderSpout(storm.Spout):
 
         # TODO:
         # Task: Initialize the file reader
-        self.fr = open("/tmp/data.txt", "r") # add file reader here
+        fname = "/tmp/data.txt"
+        self.fr = open(fname, "r") # add file reader here
         # End
 
     def nextTuple(self):
@@ -25,8 +25,10 @@ class FileReaderSpout(storm.Spout):
         # Task 1: read the next line and emit a tuple for it
         for line in self.fr.readlines():
             # Emit a random sentence
-            storm.logInfo("Emiting %s" % line)
+            # storm.logInfo("Emiting %s" % line)
+            line = line.strip()
             storm.emit([line])
+
         # Task 2: don't forget to sleep for 1 second when the file is entirely read to prevent a busy-loop
         sleep(1)
         self._complete = True

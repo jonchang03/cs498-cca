@@ -10,14 +10,15 @@ class TopNFinderBolt(storm.BasicBolt):
         self._conf = conf
         self._context = context
 
-        storm.logInfo("Counter bolt instance starting...")
+        # storm.logInfo("Counter bolt instance starting...")
 
         # TODO:
         # Task: set N
-        pass
+        self._N = 10 # figure out how to get from flux
         # End
 
         # Hint: Add necessary instance variables and classes if needed
+        self._counter = Counter()
 
     def process(self, tup):
         '''
@@ -26,7 +27,25 @@ class TopNFinderBolt(storm.BasicBolt):
         Hint: implement efficient algorithm so that it won't be shutdown before task finished
               the algorithm we used when we developed the auto-grader is maintaining a N size min-heap
         '''
-        pass
+        word = tup.values[0]
+        count = int(tup.values[1])
+
+        # if word is not None:
+        # if word doesn't exist, add to counter
+        if word not in self._counter:
+            self._counter[word] = count
+        # only update if count is greater than current count
+        elif count > self._counter[word]:
+            self._counter[word] = count
+
+        top_n_values = self._counter.most_common(self._N)
+
+        # Emit the topN and count
+        # field-value pairs ("top-N", {top N words string}) 
+        top_n = "top-N"
+        top_n_words = str(top_n_values) # convert dict to string for now
+        storm.emit([top_n, top_n_words]) 
+
         # End
 
 
